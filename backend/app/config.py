@@ -36,8 +36,8 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    # Enforce database url from environment in production
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
+    # Enforce database url from environment in production, with fallback to default
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", Config.DATABASE_URL)
 
 config_by_name = {
     "development": DevelopmentConfig,
