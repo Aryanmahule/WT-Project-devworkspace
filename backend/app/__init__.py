@@ -14,14 +14,28 @@ def create_app(config_name="development"):
     config_obj = config_by_name.get(config_name, config_by_name["development"])
     app.config.from_object(config_obj)
 
-    # Ensure upload directory exists
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    # Ensure upload directory exists safely (ignoring read-only filesystem errors)
+    try:
+        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    except Exception as e:
+        print(f"[WARN] Could not create UPLOAD_FOLDER: {e}")
 
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
     CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
     socketio.init_app(app)
+
+    # Ensure tables exist and auto-seed if empty
+    with app.app_context():
+        try:
+            db.create_all()
+            from app.models import User
+            if not User.query.first():
+                from seed_data import seed_database
+                seed_database()
+        except Exception as e:
+            print(f"[WARN] Database initialization: {e}")
 
     # Register real-time socket events
     from app.services.socket_events import register_socket_events

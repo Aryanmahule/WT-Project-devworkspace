@@ -53,31 +53,39 @@ def register():
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    data = request.get_json() or {}
-    email_or_username = data.get("email_or_username", "").strip()
-    password = data.get("password", "")
+    try:
+        data = request.get_json(silent=True) or {}
+        email_or_username = data.get("email_or_username", "").strip()
+        password = data.get("password", "")
 
-    if not email_or_username or not password:
-        return jsonify({"error": "Please provide email/username and password"}), 400
+        if not email_or_username or not password:
+            return jsonify({"error": "Please provide email/username and password"}), 400
 
-    user = User.query.filter(
-        (User.email == email_or_username.lower()) | (User.username == email_or_username)
-    ).first()
+        user = User.query.filter(
+            (User.email == email_or_username.lower()) | (User.username == email_or_username)
+        ).first()
 
-    if not user or not user.check_password(password):
-        return jsonify({"error": "Invalid credentials"}), 401
+        if not user or not user.check_password(password):
+            return jsonify({"error": "Invalid credentials"}), 401
 
-    if user.status != "active":
-        return jsonify({"error": f"Account is {user.status}. Please contact an administrator."}), 403
+        if user.status != "active":
+            return jsonify({"error": f"Account is {user.status}. Please contact an administrator."}), 403
 
-    token = generate_token(user.id, user.role, user.organization_id)
-    log_audit("user_login", "User", user.id, {"username": user.username}, user.id, user.organization_id)
+        token = generate_token(user.id, user.role, user.organization_id)
+        try:
+            log_audit("user_login", "User", user.id, {"username": user.username}, user.id, user.organization_id)
+        except Exception as audit_err:
+            print(f"[AUDIT LOG WARN] {audit_err}")
 
-    return jsonify({
-        "message": "Login successful",
-        "token": token,
-        "user": user.to_dict()
-    }), 200
+        return jsonify({
+            "message": "Login successful",
+            "token": token,
+            "user": user.to_dict()
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Login service error: {str(e)}"}), 500
 
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required

@@ -13,15 +13,27 @@ function getAuthHeaders(isFormData = false): HeadersInit {
 }
 
 async function handleResponse(response: Response) {
-  if (response.status === 401) {
-    localStorage.removeItem('apex_token');
-    localStorage.removeItem('apex_user');
-    window.dispatchEvent(new Event('auth:unauthorized'));
-    throw new Error('Session expired or unauthorized');
+  let data: any = {};
+  let text = '';
+  try {
+    text = await response.text();
+    data = JSON.parse(text);
+  } catch {
+    data = {};
   }
-  const data = await response.json().catch(() => ({}));
+
+  if (response.status === 401) {
+    if (!data.error) {
+      localStorage.removeItem('apex_token');
+      localStorage.removeItem('apex_user');
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
+    throw new Error(data.error || 'Invalid credentials or unauthorized');
+  }
+
   if (!response.ok) {
-    throw new Error(data.error || `HTTP ${response.status}: Request failed`);
+    const errorMsg = data.error || (text && text.length < 200 && !text.includes('<!DOCTYPE') ? text : `HTTP ${response.status}: Server request failed`);
+    throw new Error(errorMsg);
   }
   return data;
 }
